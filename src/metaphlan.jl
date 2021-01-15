@@ -1,18 +1,8 @@
 #==============
 MetaPhlAn Utils
 ==============#
-const taxonlevels = (
-    kingdom      = 1,
-    phylum       = 2,
-    class        = 3,
-    order        = 4,
-    family       = 5,
-    genus        = 6,
-    species      = 7,
-    subspecies   = 8,
-    unidentified = 0)
-
-const shortlevels = (
+const _shortclades = (
+    d = :domain,
     k = :kingdom,
     p = :phylum,
     c = :class,
@@ -22,90 +12,21 @@ const shortlevels = (
     s = :species,
     t = :subspecies)
 
-"""
-    taxfilter!(df::DataFrame, level::Union{Int, Symbol}; keepunidentified::Bool)
-
-Filter a MetaPhlAn table (as DataFrame) to a particular taxon level.
-Levels may be given either as numbers or symbols:
-
-- `1` = `:Kingdom`
-- `2` = `:Phylum`
-- `3` = `:Class`
-- `4` = `:Order`
-- `5` = `:Family`
-- `6` = `:Genus`
-- `7` = `:Species`
-- `8` = `:Subspecies`
-
-Taxon level is removed from resulting taxon string, eg.
-`g__Bifidobacterium` becomes `Bifidobacterium`.
-
-Set `keepunidentified` flag to `false` to remove `UNIDENTIFIED` rows.
-"""
-function taxfilter!(taxonomic_profile::AbstractDataFrame, level::Int=7; keepunidentified=true)
-    in(level, collect(1:8)) || @error "$level not a valid taxonomic level" taxonlevels
-    
-    taxonomic_profile[!, 1] = last.(parsetaxa.(taxonomic_profile[!, 1]; throw=false))
-    filter!(taxonomic_profile) do row
-        tlev = taxonlevels[row[1][2]]
-        keepunidentified ? in(tlev, (0, level)) : level == tlev
+function _split_clades(clade_string)
+    clades = split(clade_string, '|')
+    taxa = Taxon[]
+    for clade in clades
+        (level, name) = split(clade, "__")
+        push!(taxa, Taxon(name, _shortclades[Symbol(level)]))
     end
-
-    taxonomic_profile[!, 1] = map(t-> t[1], taxonomic_profile[!, 1])
-    return taxonomic_profile
+    return taxa
 end
 
-function taxfilter!(taxonomic_profile::AbstractDataFrame, level::Symbol; keepunidentified=true)
-    in(level, keys(taxonlevels)) || @error "$level not a valid taxonomic level" taxonlevels
-    taxfilter!(taxonomic_profile, taxonlevels[level]; keepunidentified=keepunidentified)
-end
-
-function taxfilter(taxonomic_profile::AbstractDataFrame, level::Int=7; keepunidentified=true)
-    filt = deepcopy(taxonomic_profile)
-    taxfilter!(filt, level; keepunidentified=keepunidentified)
-    return filt
-end
-
-function taxfilter(taxonomic_profile::AbstractDataFrame, level::Symbol; keepunidentified=true)
-    filt = deepcopy(taxonomic_profile)
-    taxfilter!(filt, level; keepunidentified=keepunidentified)
-    return filt
-end
-
-"""
-    parsetaxon(taxstring::AbstractString, taxlevel::Union{Int, Symbol})
-
-Levels may be given either as numbers or symbols:
-
-- `1` = `:Kingdom`
-- `2` = `:Phylum`
-- `3` = `:Class`
-- `4` = `:Order`
-- `5` = `:Family`
-- `6` = `:Genus`
-- `7` = `:Species`
-- `8` = `:Subspecies`
-"""
-function parsetaxon(taxstring::AbstractString, taxlevel::Int=7; throw=true)
-    taxa = parsetaxa(taxstring, throw=throw)
-    length(taxa) <= taxlevel || throw(ArgumentError("Taxonomy does not contain level $taxlevel"))
-
-    return taxa[taxlevel]
-end
-
-parsetaxon(taxstring::AbstractString, taxlevel::Symbol) = parsetaxon(taxstring, taxonlevels[taxlevel])
-
-function parsetaxa(taxstring::AbstractString; throw=true)
-    taxa = split(taxstring, '|')
-    return shortname.(taxa, throw=throw)
-end
-
-function shortname(taxon::AbstractString; throw=true)
-    m = match(r"[kpcofgst]__(\w+)", taxon)  
-    
-    if isnothing(m)
-        throw ? throw(ArgumentError("Improperly formated taxon $taxon")) : return (string(taxon), :unidentified)
-    end
-
-    return (string(m.captures[1]), shortlevels[Symbol(first(taxon))])
+function metaphlan3_profile(path::AbstractString; sample=basename(first(splitext(path))), level=:all)
+    profile = CSV.read(path, datarow=5, header=["clade", "NCBI_taxid", "abundance", "additional_species"], Tables.columntable)
+    taxa = [last(_split_clades(c)) for c in profile.clade]
+    mat = sparse(reshape(profile.abundance, length(profile.abundance), 1))
+    sample = sample isa Microbiome.AbstractSample ? sample : MicrobiomeSample(sample)
+    keep = level == :all ? Colon() : [ismissing(c) || c == level for c in clade.(taxa)]
+    return CommunityProfile(mat[keep, :], taxa[keep], [sample])
 end

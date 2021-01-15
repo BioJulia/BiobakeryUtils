@@ -1,56 +1,8 @@
 
 """
-    import_abundance_table(file::AbstractString; delim::Char='\t')
-
-Given a file path or paths to abundance tables (eg humann2 or metaphlan2),
-create abundance table. Table is presumed to have samples in columns and
-features in rows. First column is taken as feature IDs.
-"""
-function import_abundance_table(file::AbstractString; delim::Char='\t')
-    @info "Importing abundance table" file
-    df = CSV.File(file, delim=delim) |> DataFrame
-    rename!(df, names(df)[1] => :col1)
-    return df
-end
-
-
-function import_abundance_tables(files::Array{<:AbstractString, 1}; delim::Char='\t')
-    @info "Importing abundance tables"
-    fulltable = DataFrame(col1=String[])
-    for t in files
-        df = import_abundance_table(t, delim=delim)
-        fulltable = join(fulltable, df, on=:col1, kind=:outer)
-    end
-
-    # replace all missing values (from joins) with 0.
-    fulltable = map(c -> eltype(c) <: Union{<:Number, Missing} ? collect(Missings.replace(c, 0)) : c, eachcol(fulltable))
-    return fulltable
-end
-
-
-function clean_abundance_tables(files::Array{String, 1};
-                        delim::Char='\t',
-                        col1::Symbol=:taxon,
-                        suffix::String="_taxonomic_profile")
-    @info "Cleaning"
-    t = import_abundance_tables(files, delim=delim)
-
-    rename!(t, :col1 => col1)
-    rename!(n-> Symbol(replace(String(n), suffix => "")), t)
-
-    return t
-end
-
-
-function rm_strat!(df::DataFrame; col::Union{Int, Symbol}=1)
-    filter!(row->!occursin(r"\|", row[1]), df)
-end
-
-
-"""
     permanova(dm::Array{<:Real,2}, metadata::AbstractVector, nperm::Int=999;
                 label=nothing, datafilter=x->true)
-    permanova(dm::Array{<:Real,2}, metadata::AbstractDataFrame, nperm=999;
+    permanova(dm::Array{<:Real,2}, metadata, nperm=999;
                 fields=names(metadata), kwargs...)
 
 Performs PERMANOVA analysis from R's [`vegan`](https://www.rdocumentation.org/packages/vegan/versions/2.4-2) package
@@ -60,8 +12,8 @@ using the `adonis` function.
 
 - `dm`: a symetric distance matrix.
 - `metadata`: either a vector of numerical or categorical data to test against,
-  or a DataFrame with columns for each variable to test against.
-  Any missing data in the vector or rows of the DataFrame with missing data
+  or a `Tables`-compatible type with columns for each variable to test against.
+  Any missing data in the vector or rows of the Table with missing data
   will be filtered out.
 - `nperm`=999: number of permutations for PERMANOVA.
 
@@ -72,8 +24,9 @@ using the `adonis` function.
 - `label=nothing`: If provided, adds a column `label` to the results
   filled with this value.
   Useful if performing multiple runs that will be combined in a single DataFrame.
-- `fields`: if passing a DataFrame as `metadata`,
-  an array of symbols may be passed to select only certain columns
+- `fields`: if passing a table as `metadata`,
+  an array of symbols (or something to be used with `getindex`)
+  may be passed to select only certain columns
   and/or determine their order for the resulting PERMANOVA.
 
 Note: this will throw an error if `vegan` is not installed.
@@ -114,10 +67,10 @@ function permanova(dm::Array{<:Real,2}, metadata::AbstractVector, nperm::Int=999
 end
 
 
-function permanova(dm::Array{<:Real,2}, metadata::AbstractDataFrame, nperm=999;
+function permanova(dm::Array{<:Real,2}, metadata, nperm=999;
             datafilter=x->true,
             label=nothing,
-            fields=names(metadata))
+            fields=Colon())
 
     let notmissing = map(row->all(!ismissing, row[fields]), eachrow(metadata))
         metadata = metadata[notmissing, :]
@@ -141,21 +94,4 @@ function permanova(dm::Array{<:Real,2}, metadata::AbstractDataFrame, nperm=999;
     end
 
     return p
-end
-#==============
-PanPhlAn Utils
-==============#
-
-function panphlan_calcs(df::DataFrame)
-    abun = abundancetable(df)
-    dm = pairwise(Jaccard(), abun, dims=2)
-    rowdm = pairwise(Jaccard(), abun, dims=1)
-    col_clust = hclust(dm, :single)
-    row_clust = hclust(rowdm, :single)
-    optimalorder!(col_clust, dm)
-    optimalorder!(row_clust, rowdm)
-
-    mds = fit(MDS, dm, distances=true)
-
-    return abun, dm, col_clust, row_clust, mds
 end
