@@ -1,7 +1,7 @@
 module BiobakeryUtils
 
 export
-    metaphlan_v3_table,
+    metaphlan_profile,
     rm_strat!,
     permanova,
     humann2_regroup,

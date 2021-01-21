@@ -22,11 +22,14 @@ function _split_clades(clade_string)
     return taxa
 end
 
-function metaphlan3_profile(path::AbstractString; sample=basename(first(splitext(path))), level=:all)
+function metaphlan_profile(path::AbstractString; sample=basename(first(splitext(path))), level=:all)
     profile = CSV.read(path, datarow=5, header=["clade", "NCBI_taxid", "abundance", "additional_species"], Tables.columntable)
     taxa = [last(_split_clades(c)) for c in profile.clade]
     mat = sparse(reshape(profile.abundance, length(profile.abundance), 1))
     sample = sample isa Microbiome.AbstractSample ? sample : MicrobiomeSample(sample)
     keep = level == :all ? Colon() : [ismissing(c) || c == level for c in clade.(taxa)]
     return CommunityProfile(mat[keep, :], taxa[keep], [sample])
+end
+
+function metaphlan_profiles(table)
 end
