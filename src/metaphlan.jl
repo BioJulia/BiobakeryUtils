@@ -45,7 +45,6 @@ end
 """
 Option1: take a path to merged table (eg test/files/metaphlan_multi_profile.tsv)
     and make CommunityProfile
-
 Option2: take vector of paths to single tables (eg ["test/files/metaphlan_single1_profile.tsv", "test/files/metaphlan_single2_profile.tsv"])
     and make CommunityProfile
 """
@@ -54,10 +53,8 @@ end
         
 """
     taxfilter!(df::DataFrame, level::Union{Int, Symbol}; keepunidentified::Bool)
-
 Filter a MetaPhlAn table (as DataFrame) to a particular taxon level.
 Levels may be given either as numbers or symbols:
-
 - `1` = `:Kingdom`
 - `2` = `:Phylum`
 - `3` = `:Class`
@@ -66,12 +63,9 @@ Levels may be given either as numbers or symbols:
 - `6` = `:Genus`
 - `7` = `:Species`
 - `8` = `:Subspecies`
-
 Taxon level is removed from resulting taxon string, eg.
 `g__Bifidobacterium` becomes `Bifidobacterium`.
-
 Set `keepunidentified` flag to `false` to remove `UNIDENTIFIED` rows.
-
 `taxfilter!()` modifies the dataframe that you pass to it and `taxfilter()` doesn't.
 
 This function will also rename the taxa in the first column.
@@ -89,7 +83,6 @@ julia> df
    2 │ k__Bacteria|p__Firmicutes        63.1582
    3 │ k__Bacteria|p__Bacteroidetes     25.6038
    4 │ k__Bacteria|p__Actinobacteria    11.0898
-
 julia> taxfilter(df,2; keepunidentified=true)
 4×2 DataFrame
  Row │ taxon            abundance 
@@ -99,7 +92,6 @@ julia> taxfilter(df,2; keepunidentified=true)
    2 │ Bacteroidetes      25.6038
    3 │ Actinobacteria     11.0898
    4 │ Verrucomicrobia     0.1482
-
 julia> df
 4×2 DataFrame
  Row │ taxon                          abundance 
@@ -109,7 +101,6 @@ julia> df
    2 │ k__Bacteria|p__Firmicutes        63.1582
    3 │ k__Bacteria|p__Bacteroidetes     25.6038
    4 │ k__Bacteria|p__Actinobacteria    11.0898
-
 julia> taxfilter!(df,2; keepunidentified=true)
 3×2 DataFrame
  Row │ taxon           abundance 
@@ -118,7 +109,6 @@ julia> taxfilter!(df,2; keepunidentified=true)
    1 │ Firmicutes        63.1582
    2 │ Bacteroidetes     25.6038
    3 │ Actinobacteria    11.0898
-
 julia> df
 3×2 DataFrame
  Row │ taxon           abundance 
@@ -127,7 +117,6 @@ julia> df
    1 │ Firmicutes        63.1582
    2 │ Bacteroidetes     25.6038
    3 │ Actinobacteria    11.0898
-
 julia> taxfilter!(df,1; keepunidentified=true)
 3×2 DataFrame
  Row │ taxon           abundance 
@@ -197,7 +186,6 @@ Examples
  ```jldoctest parsetaxon
  julia> parsetaxon("k__Archaea|p__Euryarchaeota|c__Methanobacteria", 2)
  ("Euryarchaeota", :phylum)
-
  julia> parsetaxon("k__Archaea|p__Euryarchaeota|c__Methanobacteria")
  ("Methanobacteria", :class)
 ```
@@ -241,7 +229,6 @@ end
 
 """
     findclade(taxstring::AbstractString, taxlevel::Union{Symbol})
-
     Takes string and taxa level as arguments finds level in string:
     k = :kingdom,
     p = :phylum,
